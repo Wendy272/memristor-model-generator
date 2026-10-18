@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>忆阻器模型生成器</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --panel-2: #f8f9fb;
+    --border: #e3e6ec;
+    --border-2: #d5dae3;
+    --text: #1f2430;
+    --text-2: #2a3140;
+    --muted: #7a8291;
+    --muted-2: #8a91a0;
+    --accent: #2563eb;
+    --accent-2: #1d4ed8;
+    --accent-soft: #eaf0ff;
+    --accent-border: #c9d8ff;
+    --input-bg: #ffffff;
+    --code-bg: #171b26;
+    --code-text: #d6deeb;
+    --warn-bg: #fff7ed;
+    --warn-border: #fed7aa;
+    --warn-text: #9a3412;
+    --ok: #15803d;
+    --hover: #f2f4f8;
+  }
+  html[data-theme="dark"] {
+    --bg: #12151d;
+    --panel: #1b202b;
+    --panel-2: #202634;
+    --border: #2b3243;
+    --border-2: #39415a;
+    --text: #e6e9f0;
+    --text-2: #d2d7e2;
+    --muted: #98a1b3;
+    --muted-2: #8b94a7;
+    --accent: #6d95ff;
+    --accent-2: #8aa9ff;
+    --accent-soft: #202b45;
+    --accent-border: #3a4c78;
+    --input-bg: #222939;
+    --code-bg: #0d1017;
+    --code-text: #cfd8e6;
+    --warn-bg: #3a2515;
+    --warn-border: #6b4423;
+    --warn-text: #f0b98a;
+    --ok: #4ade80;
+    --hover: #252c3b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--border); padding: 14px 22px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .sub { font-size: 12px; color: var(--muted); }
+  .header-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .seg {
+    display: flex; border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden;
+  }
+  .seg button {
+    border: 0; background: var(--panel); color: var(--muted); padding: 6px 12px;
+    font-size: 12px; cursor: pointer; font-family: inherit;
+  }
+  .seg button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+  .icon-btn {
+    border: 1px solid var(--border-2); background: var(--panel); color: var(--text-2);
+    width: 34px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .icon-btn:hover { background: var(--hover); }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 270px; background: var(--panel); border-right: 1px solid var(--border);
+    padding: 12px; overflow-y: auto;
+  }
+  .sidebar .title { font-size: 11px; color: var(--muted-2); letter-spacing: .08em; margin: 6px 8px 10px; }
+  .model-btn {
+    width: 100%; text-align: left; border: 1px solid transparent; background: transparent;
+    padding: 9px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 4px;
+    font-size: 13px; color: var(--text-2); line-height: 1.35;
+  }
+  .model-btn:hover { background: var(--hover); }
+  .model-btn.active { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent); font-weight: 600; }
+  .model-btn small { display: block; color: var(--muted-2); font-size: 11px; font-weight: 400; margin-top: 3px; }
+  .model-btn.active small { color: var(--accent); opacity: .85; }
+  .other-group { margin-top: 14px; }
+  .other-group summary {
+    cursor: pointer; font-size: 11px; color: var(--muted-2); letter-spacing: .08em;
+    padding: 6px 8px; user-select: none; list-style: none;
+  }
+  .other-group summary::-webkit-details-marker { display: none; }
+  .other-group summary::before { content: "▸ "; }
+  .other-group[open] summary::before { content: "▾ "; }
+  .main { flex: 1; overflow-y: auto; padding: 20px 26px 40px; }
+  .panel { max-width: 980px; margin: 0 auto; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px 20px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 4px; font-weight: 650; }
+  .card .note { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px 16px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; }
+  .field input, .field select {
+    width: 100%; padding: 7px 10px; border: 1px solid var(--border-2); border-radius: 7px;
+    font-size: 13px; font-family: inherit; background: var(--input-bg); color: var(--text);
+  }
+  .field input:focus, .field select:focus {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+  }
+  .field.full { grid-column: 1 / -1; }
+  .field textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border-2); border-radius: 7px;
+    font-size: 12.5px; font-family: ui-monospace, Consolas, monospace; background: var(--input-bg);
+    resize: vertical; min-height: 60px; color: var(--text);
+  }
+  .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .hint { font-size: 11px; color: var(--muted-2); margin-top: 4px; line-height: 1.45; }
+  details.advanced { margin-top: 14px; }
+  details.advanced summary { cursor: pointer; font-size: 12px; color: var(--muted); user-select: none; }
+  details.advanced .grid { margin-top: 12px; }
+  .preview-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .preview-head .file { font-size: 12px; color: var(--muted); font-family: ui-monospace, Consolas, monospace; }
+  pre.code {
+    background: var(--code-bg); color: var(--code-text); padding: 16px; border-radius: 10px;
+    font-family: ui-monospace, Consolas, "Cascadia Code", monospace; font-size: 12px;
+    line-height: 1.55; overflow-x: auto; white-space: pre; margin: 0; max-height: 420px;
+  }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+  button.act {
+    border: 1px solid var(--border-2); background: var(--panel); color: var(--text-2);
+    padding: 8px 14px; border-radius: 8px; font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  button.act:hover { background: var(--hover); }
+  button.act.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.act.primary:hover { background: var(--accent-2); }
+  .status { font-size: 12px; margin-left: 4px; align-self: center; color: var(--ok); }
+  .warn {
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
+    padding: 9px 12px; border-radius: 8px; font-size: 12px; margin-bottom: 12px;
+    display: none; line-height: 1.5;
+  }
+  .steps { font-size: 12.5px; color: var(--muted); line-height: 1.75; }
+  .steps code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-family: ui-monospace, Consolas, monospace; color: var(--text-2); }
+  .steps li { margin-bottom: 2px; }
+  .disclaimer {
+    margin: 4px 4px 0; padding: 14px 2px 0; border-top: 1px solid var(--border);
+    font-size: 11.5px; color: var(--muted-2); line-height: 1.65; text-align: center;
+  }
+  @media (max-width: 900px) {
+    header { flex-wrap: wrap; gap: 6px 12px; padding: 12px 16px; }
+    .header-actions { margin-left: 0; }
+    .layout { flex-direction: column; }
+    .sidebar {
+      width: 100%; border-right: none; border-bottom: 1px solid var(--border);
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; flex: none;
+    }
+    .sidebar .title { display: none; }
+    #modelList, #otherList { display: flex; flex-wrap: wrap; gap: 6px; }
+    .model-btn { width: auto; white-space: nowrap; margin-bottom: 0; padding: 8px 12px; }
+    .model-btn small { display: none; }
+    .other-group { margin-top: 0; flex: 1 1 100%; }
+    .other-group summary { padding: 6px 4px; white-space: nowrap; }
+    .main { padding: 14px 14px 32px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="appTitle">忆阻器模型生成器</h1>
+  <span class="sub" id="appSub"></span>
+  <div class="header-actions">
+    <div class="seg">
+      <button id="btnZh" class="active">中文</button>
+      <button id="btnEn">EN</button>
+    </div>
+    <button class="icon-btn" id="btnTheme" title="Theme">☾</button>
+  </div>
+</header>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="title" id="groupCommon"></div>
+    <div id="modelList"></div>
+    <details class="other-group" id="otherGroup">
+      <summary id="groupOther"></summary>
+      <div id="otherList"></div>
+    </details>
+  </aside>
+  <main class="main">
+    <div class="panel">
+      <div class="card">
+        <h2 id="modelTitle"></h2>
+        <div class="note" id="modelNote"></div>
+        <div class="warn" id="warnBox"></div>
+        <div id="formArea"></div>
+        <div class="actions">
+          <button class="act" id="btnLib"></button>
+          <button class="act primary" id="btnZip"></button>
+          <button class="act" id="btnCopy"></button>
+          <span class="status" id="statusMsg"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="preview-head">
+          <h2 style="margin:0" id="previewTitle"></h2>
+          <span class="file" id="fileName"></span>
+        </div>
+        <pre class="code" id="preview"></pre>
+      </div>
+
+      <div class="card">
+        <h2 id="howTitle"></h2>
+        <div class="steps"><ol id="howList"></ol></div>
+      </div>
+
+      <div class="disclaimer" id="disclaimer"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ============================================================
+// i18n
+// ============================================================
+const UI = {
+  zh: {
+    title: '忆阻器模型生成器',
+    sub: '选模型 → 填参数 → 生成 .lib / LTspice 原理图',
+    common: '常用模型',
+    other: '其他模型',
+    modelName: '模型名（子电路名）',
+    modelNameHint: '只能用字母、数字、下划线；会同时作为文件名',
+    advanced: '高级参数（一般不用改）',
+    testbench: '测试台设置',
+    amp: '幅值 (V)',
+    freq: '频率 (Hz)',
+    tstop: '仿真时长 (s)',
+    maxstep: '最大步长',
+    dlLib: '下载 .lib',
+    dlZip: '下载原理图包 (.zip)',
+    copy: '复制 lib',
+    preview: '预览',
+    how: '怎么用',
+    steps: [
+      '点“下载原理图包 (.zip)”，解压到一个文件夹。',
+      '用 LTspice 打开 test_模型名.asc（原理图里能看到忆阻器符号）。',
+      '按 Alt+R 运行。',
+      '波形窗口按 A 加 -I(V1)，右键横轴选 V(top)，就是捏滞回线。',
+      '要改参数，回这个网页改，重新下载覆盖即可。'
+    ],
+    paramLines: '参数（一行一个 key=value）',
+    statevar: '状态变量名',
+    x0: '初值 x0',
+    stateExpr: '状态方程（电容充电电流）',
+    stateExprHint: '可用 V(x)、V(plus)、V(minus)、I(Vsense)、参数名。单位：每秒的 x 变化量。',
+    currentExpr: '读出方程（器件电流）',
+    currentExprHint: '通用写法：V(plus,minus) / 电阻表达式',
+    copied: '已复制',
+    libDone: '.lib 已下载',
+    zipDone: '原理图包已下载',
+    fail: '生成失败：',
+    warnRon: 'RON / ROFF 必须是正数。',
+    warnRatio: 'ROFF 应该大于 RON。',
+    warnVp: '正阈值 VtR 应大于 0。',
+    warnVn: '负阈值 VtL 应小于 0。',
+    warnX0: 'x0 应在 0 到 1 之间。',
+    disclaimer: '本工具仅供学习与教学使用，不用于商业、生产或任何工程决策。模型为行为级近似，不代表真实器件的全部特性。'
+  },
+  en: {
+    title: 'Memristor Model Generator',
+    sub: 'Pick a model → set parameters → export .lib / LTspice schematic',
+    common: 'Common models',
+    other: 'Other models',
+    modelName: 'Model name (subckt name)',
+    modelNameHint: 'Letters, digits and underscore only; also used as the file name',
+    advanced: 'Advanced parameters (usually not needed)',
+    testbench: 'Testbench settings',
+    amp: 'Amplitude (V)',
+    freq: 'Frequency (Hz)',
+    tstop: 'Stop time (s)',
+    maxstep: 'Max step',
+    dlLib: 'Download .lib',
+    dlZip: 'Download schematic pack (.zip)',
+    copy: 'Copy lib',
+    preview: 'Preview',
+    how: 'How to use',
+    steps: [
+      'Click “Download schematic pack (.zip)” and extract it into a folder.',
+      'Open test_<model>.asc in LTspice (you should see the memristor symbol).',
+      'Press Alt+R to run.',
+      'In the waveform window press A and add -I(V1); right-click the x-axis and choose V(top).',
+      'To change parameters, edit them here and download again.'
+    ],
+    paramLines: 'Parameters (one key=value per line)',
+    statevar: 'State variable name',
+    x0: 'Initial value x0',
+    stateExpr: 'State equation (capacitor charging current)',
+    stateExprHint: 'Available: V(x), V(plus), V(minus), I(Vsense), parameter names. Unit: dx/dt.',
+    currentExpr: 'Readout equation (device current)',
+    currentExprHint: 'Typical form: V(plus,minus) / resistance expression',
+    copied: 'Copied',
+    libDone: '.lib downloaded',
+    zipDone: 'Schematic pack downloaded',
+    fail: 'Generation failed: ',
+    warnRon: 'RON / ROFF must be positive.',
+    warnRatio: 'ROFF should be greater than RON.',
+    warnVp: 'Positive threshold VtR should be > 0.',
+    warnVn: 'Negative threshold VtL should be < 0.',
+    warnX0: 'x0 should be between 0 and 1.',
+    disclaimer: 'For learning and teaching purposes only. Not intended for commercial, production, or engineering decisions. Models are behavioral approximations, not full device models.'
+  }
+};
+
+let lang = localStorage.getItem('mm_lang') || 'zh';
+let theme = localStorage.getItem('mm_theme') || 'light';
+const t = k => UI[lang][k];
+const L = o => (o && (o[lang] || o.zh)) || '';
+
+// ============================================================
+// model builders
+// ============================================================
+function strukovBase(p, winExpr) {
+  return `.subckt ${p.name} plus minus
+.param Ron=${p.ron} Roff=${p.roff} D=${p.d} uv=${p.uv} x0=${p.x0}
+
+* state: normalized doped-front position x in [0,1]
+Cx x 0 1
+.ic V(x)={x0}
+
+* 0 V sense source: I(Vsense) = device current
+Vsense plus Mid 0
+
+* dx/dt = (uv*Ron/D^2) * i(t) * window(x)
+Bx 0 x I={uv*Ron/pow(D,2)*I(Vsense)*${winExpr}}
+
+* R(x) = Ron*x + Roff*(1-x)
+Bmem Mid minus I={V(Mid,minus)/(Ron*limit(V(x),0,1)+Roff*(1-limit(V(x),0,1)))}
+
+.ends ${p.name}`;
+}
+
+const MODELS = {
+  strukov: {
+    label: { zh: 'Strukov 线性漂移 (HP 2008)', en: 'Strukov Linear Drift (HP 2008)' },
+    short: { zh: '最经典的离子漂移模型，无窗口', en: 'Classic ion-drift model, no window' },
+    note: {
+      zh: '状态变量 x 是归一化掺杂前沿位置。R = Ron·x + Roff(1−x)，线性。没有阈值电压，开关快慢由 μv 决定。',
+      en: 'State x is the normalized doped-front position. R = Ron·x + Roff(1−x), linear. No threshold; switching speed is set by μv.'
+    },
+    group: 'main',
+    defaultName: 'StrukovModel',
+    params: [
+      { key: 'ron',  label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 100 },
+      { key: 'roff', label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 1000 },
+      { key: 'd',    label: { zh: 'D (m)', en: 'D (m)' }, def: '10n', hint: { zh: '薄膜厚度，如 10n', en: 'Film thickness, e.g. 10n' } },
+      { key: 'uv',   label: { zh: 'μv (m²/Vs)', en: 'μv (m²/Vs)' }, def: '10f', hint: { zh: '离子迁移率，如 10f', en: 'Ion mobility, e.g. 10f' } },
+      { key: 'x0',   label: { zh: 'x0 (0~1)', en: 'x0 (0~1)' }, def: 0.5 }
+    ],
+    tb: { amp: 1, freq: 20, tstop: 0.3, maxstep: '20u', statevar: 'x' },
+    build(p) { return strukovBase(p, '1'); }
+  },
+
+  vourkas: {
+    label: { zh: 'Vourkas 2013 阈值隧道势垒', en: 'Vourkas 2013 Threshold Tunnel Barrier' },
+    short: { zh: '带可编程阈值、指数电阻', en: 'Programmable thresholds, exponential resistance' },
+    note: {
+      zh: '状态变量 r 是积分电容上的电压。R = fo·e^(2L)/L，指数关系，正负阈值可分别设置。内部参数按 RON/ROFF 自动反解。',
+      en: 'State r is the voltage on the integrating capacitor. R = fo·e^(2L)/L, exponential. Thresholds are set independently; internal parameters are solved from RON/ROFF.'
+    },
+    group: 'main',
+    defaultName: 'VourkasModel',
+    params: [
+      { key: 'ron',    label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 2000 },
+      { key: 'roff',   label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 200000 },
+      { key: 'vset',   label: { zh: '正阈值 VtR (V)', en: 'Positive threshold VtR (V)' }, def: 1.5 },
+      { key: 'vreset', label: { zh: '负阈值 VtL (V)', en: 'Negative threshold VtL (V)' }, def: -1.5 },
+      { key: 'alpha',  label: { zh: '开关速率 alpha', en: 'Switching rate alpha' }, def: '1e6', hint: { zh: '越大开关越陡，论文 Fig.2 用 1e6', en: 'Larger = sharper switching; Fig.2 uses 1e6' } },
+      { key: 'rmin',   label: { zh: 'rmin', en: 'rmin' }, def: 100, adv: true },
+      { key: 'rmax',   label: { zh: 'rmax', en: 'rmax' }, def: 390, adv: true },
+      { key: 'm',      label: { zh: 'm', en: 'm' }, def: 82,  adv: true }
+    ],
+    tb: { amp: 3, freq: 100, tstop: 0.05, maxstep: '1u', statevar: 'r' },
+    build(p) {
+      const rmin = +p.rmin, rmax = +p.rmax, m = +p.m;
+      const { Lo, fo } = solveVourkas(+p.ron, +p.roff, rmin, rmax, m);
+      return `.subckt ${p.name} plus minus
+.param rmin=${rmin} rmax=${rmax} rinit=${rmax} alpha=${p.alpha} beta=10 gamma=0.1
+.param VtR=${p.vset} VtL=${p.vreset} yo=0.0001 m=${m} fo=${fmt(fo)} Lo=${fmt(Lo)}
+
+* state: r (voltage on the 1 F integrating capacitor)
+Bgr 0 r I={dr_dt(V(plus)-V(minus))*(st_f(V(plus)-V(minus))*st_f(V(r)-rmin)+st_f(-(V(plus)-V(minus)))*st_f(rmax-V(r)))}
+Cr r 0 1 IC={rinit}
+Raux r 0 1E12
+
+* behavioural resistor: I = V / R(L)
+Bgpm plus minus I={(V(plus)-V(minus))/((fo*exp(2*Lf(V(r))))/Lf(V(r)))}
+
+.func dr_dt(y)={-alpha*((y-VtL)/(gamma+abs(y-VtL)))*st_f(-y+VtL)-beta*y*st_f(y-VtL)*st_f(-y+VtR)-alpha*((y-VtR)/(gamma+abs(y-VtR)))*st_f(y-VtR)}
+.func st_f(y)={1/(exp(-y/yo)+1)}
+.func Lf(y)={Lo-Lo*m/y}
+.ends ${p.name}`;
+    }
+  },
+
+  vteam: {
+    label: { zh: 'VTEAM 阈值自适应 (Kvatinsky 2015)', en: 'VTEAM Threshold Adaptive (Kvatinsky 2015)' },
+    short: { zh: '阈值 + 线性 R(x)，参数少', en: 'Thresholds + linear R(x), few parameters' },
+    note: {
+      zh: '状态变量 x 在 [0,1]。|v| 超过阈值后按幂律移动，R = Ron + (Roff−Ron)·x。适合做逻辑/阵列级仿真。',
+      en: 'State x in [0,1]. Above the |v| threshold the state moves by a power law; R = Ron + (Roff−Ron)·x. Good for logic and array-level simulation.'
+    },
+    group: 'main',
+    defaultName: 'VteamModel',
+    params: [
+      { key: 'ron',  label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 100 },
+      { key: 'roff', label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 10000 },
+      { key: 'von',  label: { zh: '正阈值 von (V)', en: 'Positive threshold von (V)' }, def: 0.5 },
+      { key: 'voff', label: { zh: '负阈值 voff (V)', en: 'Negative threshold voff (V)' }, def: -0.5 },
+      { key: 'kon',  label: { zh: 'k_on', en: 'k_on' }, def: 1, type: 'text' },
+      { key: 'koff', label: { zh: 'k_off', en: 'k_off' }, def: 1, type: 'text' },
+      { key: 'aon',  label: { zh: 'alpha_on', en: 'alpha_on' }, def: 1 },
+      { key: 'aoff', label: { zh: 'alpha_off', en: 'alpha_off' }, def: 1 },
+      { key: 'x0',   label: { zh: 'x0 (0~1)', en: 'x0 (0~1)' }, def: 0.5 }
+    ],
+    tb: { amp: 1, freq: 1, tstop: 3, maxstep: '1m', statevar: 'x' },
+    build(p) {
+      return `.subckt ${p.name} plus minus
+.param Ron=${p.ron} Roff=${p.roff} von=${p.von} voff=${p.voff}
+.param kon=${p.kon} koff=${p.koff} aon=${p.aon} aoff=${p.aoff} x0=${p.x0}
+
+* state: normalized x in [0,1]
+Cx x 0 1
+.ic V(x)={x0}
+
+* VTEAM state equation (x increases above von, decreases below voff)
+Bx 0 x I={if(V(plus)-V(minus)>von, kon*pow((V(plus)-V(minus))/von-1,aon), 0) - if(V(plus)-V(minus)<voff, koff*pow((V(plus)-V(minus))/voff-1,aoff), 0)}
+
+* R(x) = Ron + (Roff-Ron)*x
+Bmem plus minus I={(V(plus)-V(minus))/(Ron+(Roff-Ron)*limit(V(x),0,1))}
+
+.ends ${p.name}`;
+    }
+  },
+
+  wang: {
+    label: { zh: 'Wang 2021 二值化行为模型', en: 'Wang 2021 Binarized Behavioral Model' },
+    short: { zh: '硬阈值、两态切换，适合数字逻辑', en: 'Hard threshold, two-state switching, for digital logic' },
+    note: {
+      zh: '电压越过 ±Vt 时状态按指数快速移动，R(x) 在 RON/ROFF 之间硬切换。论文原模型，适合 IMPLY/MAGIC 这类数字逻辑仿真。',
+      en: 'Above ±Vt the state moves exponentially; R(x) switches hard between RON and ROFF. Original model from the paper, suitable for IMPLY/MAGIC logic.'
+    },
+    group: 'main',
+    x0Free: true,
+    defaultName: 'WangModel',
+    params: [
+      { key: 'ron',  label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 100 },
+      { key: 'roff', label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 1000 },
+      { key: 'vt',   label: { zh: '阈值 Vt (V)', en: 'Threshold Vt (V)' }, def: 1.2 },
+      { key: 'a',    label: { zh: '参数 a', en: 'Parameter a' }, def: 10 },
+      { key: 'x0',   label: { zh: '初值 x0', en: 'Initial x0' }, def: -2, hint: { zh: '负值=ROFF，正值=RON', en: 'Negative = ROFF, positive = RON' } }
+    ],
+    tb: { amp: 1.3, freq: 10, tstop: 2, maxstep: '10u', statevar: 'x' },
+    build(p) {
+      return `.subckt ${p.name} plus minus
+.param R0=${p.roff} R1=${p.ron} a=${p.a} Vt=${p.vt} x0=${p.x0}
+Cx x 0 1
+.ic V(x)={x0}
+
+* eq.(1): dx/dt = 1/e^(x-a) above +Vt, -1/e^(-x-a) below -Vt, 0 inside
+Bx 0 x I={if(V(plus)-V(minus)>Vt, 1/exp(V(x)-a), if(V(plus)-V(minus)>-Vt, 0, -1/exp(-V(x)-a)))}
+
+* R(x) = RON if x>=0, ROFF if x<0
+Bmem plus minus I={(V(plus)-V(minus))/(if(V(x)<0,R0,R1))}
+
+.ends ${p.name}`;
+    }
+  },
+
+  custom: {
+    label: { zh: '自定义模型 (四元组)', en: 'Custom Model (Four Slots)' },
+    short: { zh: '自己写状态方程和读出方程', en: 'Write your own state and readout equations' },
+    note: {
+      zh: '四元组：状态变量 + 状态方程 + 读出方程 + 边界。状态节点固定为 x，用 I(Vsense) 取器件电流。',
+      en: 'Four slots: state variable + state equation + readout equation + boundary. State node is x; use I(Vsense) for the device current.'
+    },
+    group: 'main',
+    defaultName: 'CustomModel',
+    params: [],
+    tb: { amp: 1, freq: 20, tstop: 0.3, maxstep: '20u', statevar: 'x' },
+    build(p) {
+      const params = (p.paramLines || '').split(/\r?\n/).map(s => s.trim()).filter(Boolean).join(' ');
+      return `.subckt ${p.name} plus minus
+.param ${params}
+Cx ${p.statevar} 0 1
+.ic V(${p.statevar})={${p.x0}}
+Vsense plus Mid 0
+Bx 0 ${p.statevar} I={${p.stateExpr}}
+Bmem Mid minus I={${p.currentExpr}}
+.ends ${p.name}`;
+    }
+  },
+
+  benderli: {
+    label: { zh: 'Strukov + Benderli 窗', en: 'Strukov + Benderli Window' },
+    short: { zh: '窗口 x(1−x)，回线较窄', en: 'Window x(1−x), narrower loop' },
+    note: {
+      zh: '在 Strukov 模型上加 Benderli 窗口 F(x)=x(1−x)。窗口在两端为零，回线比无窗模型窄。',
+      en: 'Strukov model with the Benderli window F(x)=x(1−x). The window is zero at both ends, so the loop is narrower than the unwindowed model.'
+    },
+    group: 'other',
+    defaultName: 'BenderliModel',
+    params: [
+      { key: 'ron',  label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 100 },
+      { key: 'roff', label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 1000 },
+      { key: 'd',    label: { zh: 'D (m)', en: 'D (m)' }, def: '10n' },
+      { key: 'uv',   label: { zh: 'μv (m²/Vs)', en: 'μv (m²/Vs)' }, def: '10f' },
+      { key: 'x0',   label: { zh: 'x0 (0~1)', en: 'x0 (0~1)' }, def: 0.5 }
+    ],
+    tb: { amp: 1, freq: 20, tstop: 0.5, maxstep: '20u', statevar: 'x' },
+    build(p) { return strukovBase(p, 'limit(V(x)*(1-V(x)),0,1)'); }
+  },
+
+  joglekar: {
+    label: { zh: 'Strukov + Joglekar 窗', en: 'Strukov + Joglekar Window' },
+    short: { zh: '窗口 1−(2x−1)^(2p)', en: 'Window 1−(2x−1)^(2p)' },
+    note: {
+      zh: 'Joglekar 窗口在两端为零、中间为一。p 越大越接近矩形，但状态容易“粘”在边界。',
+      en: 'Joglekar window is zero at both ends and one in the middle. Larger p approaches a rectangle, but the state tends to stick at the boundary.'
+    },
+    group: 'other',
+    defaultName: 'JoglekarModel',
+    params: [
+      { key: 'ron',  label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 100 },
+      { key: 'roff', label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 1000 },
+      { key: 'd',    label: { zh: 'D (m)', en: 'D (m)' }, def: '10n' },
+      { key: 'uv',   label: { zh: 'μv (m²/Vs)', en: 'μv (m²/Vs)' }, def: '10f' },
+      { key: 'x0',   label: { zh: 'x0 (0~1)', en: 'x0 (0~1)' }, def: 0.5 },
+      { key: 'p',    label: { zh: '窗口指数 p', en: 'Window exponent p' }, def: 1 }
+    ],
+    tb: { amp: 1, freq: 20, tstop: 0.5, maxstep: '20u', statevar: 'x' },
+    build(p) { return strukovBase(p, `limit(1-pow(2*V(x)-1,2*${p.p}),0,1)`); }
+  },
+
+  biolek: {
+    label: { zh: 'Strukov + Biolek 窗', en: 'Strukov + Biolek Window' },
+    short: { zh: '带电流方向的窗口，不粘边界', en: 'Current-direction window, no boundary sticking' },
+    note: {
+      zh: 'Biolek 窗口引入电流方向 stp(i)，解决了 Joglekar 窗口“粘在边界”的问题。论文示例 p=7。',
+      en: 'Biolek window uses the current direction stp(i), fixing the boundary-sticking of the Joglekar window. Paper example uses p=7.'
+    },
+    group: 'other',
+    defaultName: 'BiolekModel',
+    params: [
+      { key: 'ron',  label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 100 },
+      { key: 'roff', label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 1000 },
+      { key: 'd',    label: { zh: 'D (m)', en: 'D (m)' }, def: '10n' },
+      { key: 'uv',   label: { zh: 'μv (m²/Vs)', en: 'μv (m²/Vs)' }, def: '10f' },
+      { key: 'x0',   label: { zh: 'x0 (0~1)', en: 'x0 (0~1)' }, def: 0.5 },
+      { key: 'p',    label: { zh: '窗口指数 p', en: 'Window exponent p' }, def: 7 }
+    ],
+    tb: { amp: 1, freq: 20, tstop: 1, maxstep: '20u', statevar: 'x' },
+    build(p) { return strukovBase(p, `limit(1-pow(V(x)-if(I(Vsense)<=0,1,0),2*${p.p}),0,1)`); }
+  },
+
+  prodromakis: {
+    label: { zh: 'Strukov + Prodromakis 窗', en: 'Strukov + Prodromakis Window' },
+    short: { zh: '可调幅度的窗口', en: 'Adjustable-amplitude window' },
+    note: {
+      zh: 'Prodromakis 窗口用 j 和 p 两个参数调节形状。论文示例 j=4、p=1（此时与 Joglekar p=1 等价）。',
+      en: 'Prodromakis window uses j and p to shape the window. Paper example j=4, p=1 (identical to Joglekar p=1).'
+    },
+    group: 'other',
+    defaultName: 'ProdromakisModel',
+    params: [
+      { key: 'ron',  label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 100 },
+      { key: 'roff', label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 1000 },
+      { key: 'd',    label: { zh: 'D (m)', en: 'D (m)' }, def: '10n' },
+      { key: 'uv',   label: { zh: 'μv (m²/Vs)', en: 'μv (m²/Vs)' }, def: '10f' },
+      { key: 'x0',   label: { zh: 'x0 (0~1)', en: 'x0 (0~1)' }, def: 0.5 },
+      { key: 'p',    label: { zh: '指数 p', en: 'Exponent p' }, def: 1 },
+      { key: 'j',    label: { zh: '缩放 j', en: 'Scale j' }, def: 4 }
+    ],
+    tb: { amp: 1, freq: 20, tstop: 0.5, maxstep: '20u', statevar: 'x' },
+    build(p) { return strukovBase(p, `limit(${p.j}*(1-pow(pow(V(x)-0.5,2)+0.75,${p.p})),0,1)`); }
+  },
+
+  team: {
+    label: { zh: 'TEAM 电流阈值模型', en: 'TEAM Current-Threshold Model' },
+    short: { zh: '按电流阈值切换', en: 'Switches on current thresholds' },
+    note: {
+      zh: 'TEAM 用电流阈值而不是电压阈值：|i| 超过阈值后状态按幂律移动。是 VTEAM 的前身。',
+      en: 'TEAM uses current thresholds instead of voltage: above the |i| threshold the state moves by a power law. Predecessor of VTEAM.'
+    },
+    group: 'other',
+    defaultName: 'TeamModel',
+    params: [
+      { key: 'ron',  label: { zh: 'RON (Ω)', en: 'RON (Ω)' }, def: 100 },
+      { key: 'roff', label: { zh: 'ROFF (Ω)', en: 'ROFF (Ω)' }, def: 10000 },
+      { key: 'ion',  label: { zh: '正阈值 i_on (A)', en: 'Positive threshold i_on (A)' }, def: '1e-4' },
+      { key: 'ioff', label: { zh: '负阈值 i_off (A)', en: 'Negative threshold i_off (A)' }, def: '-1e-4' },
+      { key: 'kon',  label: { zh: 'k_on', en: 'k_on' }, def: 1 },
+      { key: 'koff', label: { zh: 'k_off', en: 'k_off' }, def: 1 },
+      { key: 'aon',  label: { zh: 'alpha_on', en: 'alpha_on' }, def: 1 },
+      { key: 'aoff', label: { zh: 'alpha_off', en: 'alpha_off' }, def: 1 },
+      { key: 'x0',   label: { zh: 'x0 (0~1)', en: 'x0 (0~1)' }, def: 0.5 }
+    ],
+    tb: { amp: 1, freq: 1, tstop: 3, maxstep: '1m', statevar: 'x' },
+    build(p) {
+      return `.subckt ${p.name} plus minus
+.param Ron=${p.ron} Roff=${p.roff} ion=${p.ion} ioff=${p.ioff}
+.param kon=${p.kon} koff=${p.koff} aon=${p.aon} aoff=${p.aoff} x0=${p.x0}
+.func st_f(y)={1/(exp(-y/0.0001)+1)}
+
+Cx x 0 1
+.ic V(x)={x0}
+Vsense plus Mid 0
+
+* current-threshold state equation, gated at x=0 and x=1
+Bx 0 x I={(if(I(Vsense)>ion, kon*pow(I(Vsense)/ion-1,aon), 0) - if(I(Vsense)<ioff, koff*pow(I(Vsense)/ioff-1,aoff), 0))*(st_f(V(x))*(1-st_f(V(x)-1)))}
+
+Bmem Mid minus I={V(Mid,minus)/(Ron*limit(V(x),0,1)+Roff*(1-limit(V(x),0,1)))}
+
+.ends ${p.name}`;
+    }
+  },
+
+  ideal: {
+    label: { zh: '理想忆阻器 (Chua 电荷控制)', en: 'Ideal Memristor (Chua Charge-Controlled)' },
+    short: { zh: 'R 随电荷线性变化', en: 'R varies linearly with charge' },
+    note: {
+      zh: '最接近 Chua 原始定义的理想忆阻器：q=∫i dt，R(q)=R0+kq。没有物理机理，但捏滞回线最干净。',
+      en: "Closest to Chua's original ideal memristor: q=∫i dt, R(q)=R0+kq. No physical mechanism, but the cleanest pinched loop."
+    },
+    group: 'other',
+    defaultName: 'IdealModel',
+    params: [
+      { key: 'r0',   label: { zh: 'R0 (Ω)', en: 'R0 (Ω)' }, def: 1000 },
+      { key: 'k',    label: { zh: 'k (Ω/C)', en: 'k (Ω/C)' }, def: '1e6' },
+      { key: 'rmin', label: { zh: 'Rmin (Ω)', en: 'Rmin (Ω)' }, def: 100 },
+      { key: 'rmax', label: { zh: 'Rmax (Ω)', en: 'Rmax (Ω)' }, def: 100000 },
+      { key: 'q0',   label: { zh: '初始电荷 q0', en: 'Initial charge q0' }, def: 0 }
+    ],
+    tb: { amp: 1, freq: 1, tstop: 5, maxstep: '50u', statevar: 'q' },
+    build(p) {
+      return `.subckt ${p.name} plus minus
+.param R0=${p.r0} k=${p.k} Rmin=${p.rmin} Rmax=${p.rmax} q0=${p.q0}
+Cq q 0 1
+.ic V(q)={q0}
+Vsense plus Mid 0
+
+* q = integral of device current
+Bq 0 q I={I(Vsense)}
+
+* R(q) = R0 + k*q
+Bmem Mid minus I={V(Mid,minus)/limit(R0+k*V(q),Rmin,Rmax)}
+
+.ends ${p.name}`;
+    }
+  }
+};
+
+// ============================================================
+// helpers
+// ============================================================
+function fmt(x) {
+  if (!isFinite(x)) return '0';
+  const s = Number(x);
+  if (Math.abs(s) >= 1e-4 && Math.abs(s) < 1e6) return String(+s.toPrecision(10));
+  return s.toExponential(6).replace(/e\+?/, 'e');
+}
+
+function solveVourkas(ron, roff, rmin, rmax, m) {
+  const Ls = Lo => [Lo * (1 - m / rmin), Lo * (1 - m / rmax)];
+  const ratio = Lo => {
+    const [Lmin, Lmax] = Ls(Lo);
+    return (Math.exp(2 * Lmax) / Lmax) / (Math.exp(2 * Lmin) / Lmin);
+  };
+  const target = roff / ron;
+  let lo = 0.05, hi = 60;
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (ratio(mid) < target) lo = mid; else hi = mid;
+  }
+  const Lo = (lo + hi) / 2;
+  const Lmin = Ls(Lo)[0];
+  const fo = ron * Lmin / Math.exp(2 * Lmin);
+  return { Lo, fo };
+}
+
+function sanitizeName(s, fallback) {
+  let n = String(s || '').trim().replace(/[^A-Za-z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');
+  if (!n) n = fallback || 'memristor';
+  if (!/^[A-Za-z_]/.test(n)) n = 'M_' + n;
+  return n;
+}
+
+function buildAsy(modelName) {
+  return `Version 4
+SymbolType CELL
+RECTANGLE Normal -32 -40 32 40
+LINE Normal 0 -64 0 -40
+LINE Normal 0 40 0 64
+LINE Normal -16 -16 16 16
+LINE Normal 16 -16 -16 16
+PIN 0 -64 NONE 0
+PINATTR PinName plus
+PINATTR SpiceOrder 1
+PIN 0 64 NONE 0
+PINATTR PinName minus
+PINATTR SpiceOrder 2
+SYMATTR Prefix X
+SYMATTR Value ${modelName}
+SYMATTR Description Memristor subcircuit
+`;
+}
+
+function buildAsc(p) {
+  const tb = p.tb;
+  return `Version 4
+SHEET 1 880 680
+WIRE 300 84 500 84
+WIRE 300 164 300 280
+WIRE 500 212 500 280
+WIRE 500 280 300 280
+FLAG 500 84 Top
+FLAG 300 280 0
+SYMBOL voltage 300 68 R0
+SYMATTR InstName V1
+SYMATTR Value SINE(0 ${tb.amp} ${tb.freq})
+SYMBOL memristor 500 148 R0
+SYMATTR InstName X1
+SYMATTR Value ${p.name}
+TEXT 600 120 Left 2 !.include ${p.name}.lib
+TEXT 600 160 Left 2 !.tran 0 ${tb.tstop} 0 ${tb.maxstep}
+TEXT 600 200 Left 2 !.save V(Top) I(V1) V(X1:${tb.statevar})
+`;
+}
+
+// ---------- minimal store-only zip ----------
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const chunks = [], central = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xFFFF;
+  const dosDate = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xFFFF;
+
+  for (const f of files) {
+    const name = enc.encode(f.name);
+    const data = enc.encode(f.data);
+    const crc = crc32(data);
+    const local = new Uint8Array(30 + name.length);
+    const dv = new DataView(local.buffer);
+    dv.setUint32(0, 0x04034b50, true);
+    dv.setUint16(4, 20, true);
+    dv.setUint16(6, 0x0800, true);
+    dv.setUint16(8, 0, true);
+    dv.setUint16(10, dosTime, true);
+    dv.setUint16(12, dosDate, true);
+    dv.setUint32(14, crc, true);
+    dv.setUint32(18, data.length, true);
+    dv.setUint32(22, data.length, true);
+    dv.setUint16(26, name.length, true);
+    dv.setUint16(28, 0, true);
+    local.set(name, 30);
+    chunks.push(local, data);
+
+    const cen = new Uint8Array(46 + name.length);
+    const cv = new DataView(cen.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, dosTime, true);
+    cv.setUint16(14, dosDate, true);
+    cv.setUint32(16, crc, true);
+    cv.setUint32(20, data.length, true);
+    cv.setUint32(24, data.length, true);
+    cv.setUint16(28, name.length, true);
+    cv.setUint16(30, 0, true);
+    cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true);
+    cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0, true);
+    cv.setUint32(42, offset, true);
+    cen.set(name, 46);
+    central.push(cen);
+
+    offset += local.length + data.length;
+  }
+  const centralSize = central.reduce((a, b) => a + b.length, 0);
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, files.length, true);
+  ev.setUint16(10, files.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob([...chunks, ...central, eocd], { type: 'application/zip' });
+}
+
+function download(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+
+// ============================================================
+// UI
+// ============================================================
+let currentKey = 'vourkas';
+const values = {};
+
+function initValues(key) {
+  if (values[key]) return values[key];
+  const m = MODELS[key];
+  const v = { name: m.defaultName };
+  m.params.forEach(p => v[p.key] = p.def);
+  if (key === 'custom') {
+    v.statevar = 'x';
+    v.x0 = 0.5;
+    v.paramLines = 'Ron=100 Roff=1000';
+    v.stateExpr = '1e4*I(Vsense)*limit(4*V(x)*(1-V(x)),0,1)';
+    v.currentExpr = 'V(plus,minus)/(Ron*limit(V(x),0,1)+Roff*(1-limit(V(x),0,1)))';
+  }
+  values[key] = v;
+  return v;
+}
+
+function modelButton(key) {
+  const m = MODELS[key];
+  const b = document.createElement('button');
+  b.className = 'model-btn' + (key === currentKey ? ' active' : '');
+  b.innerHTML = `${L(m.label)}<small>${L(m.short)}</small>`;
+  b.onclick = () => { currentKey = key; renderAll(); };
+  return b;
+}
+
+function renderList() {
+  const main = document.getElementById('modelList');
+  const other = document.getElementById('otherList');
+  main.innerHTML = ''; other.innerHTML = '';
+  for (const key of Object.keys(MODELS)) {
+    if (MODELS[key].group === 'other') other.appendChild(modelButton(key));
+    else main.appendChild(modelButton(key));
+  }
+  if (MODELS[currentKey].group === 'other') document.getElementById('otherGroup').open = true;
+}
+
+function renderForm() {
+  const m = MODELS[currentKey];
+  const v = initValues(currentKey);
+  document.getElementById('modelTitle').textContent = L(m.label);
+  document.getElementById('modelNote').textContent = L(m.note);
+  const area = document.getElementById('formArea');
+  area.innerHTML = '';
+
+  const nameWrap = document.createElement('div');
+  nameWrap.className = 'grid';
+  nameWrap.innerHTML = `<div class="field"><label>${t('modelName')}</label>
+    <input id="f_name" type="text" value="${v.name}">
+    <div class="hint">${t('modelNameHint')}</div></div>`;
+  area.appendChild(nameWrap);
+  nameWrap.querySelector('#f_name').oninput = e => { v.name = e.target.value; update(); };
+
+  if (currentKey === 'custom') {
+    const g = document.createElement('div');
+    g.className = 'grid';
+    g.style.marginTop = '14px';
+    g.innerHTML = `
+      <div class="field"><label>${t('paramLines')}</label>
+        <textarea id="f_paramLines">${v.paramLines}</textarea></div>
+      <div class="field"><label>${t('statevar')}</label>
+        <input id="f_statevar" type="text" value="${v.statevar}"></div>
+      <div class="field"><label>${t('x0')}</label>
+        <input id="f_x0" type="text" value="${v.x0}"></div>
+      <div class="field full"><label>${t('stateExpr')}</label>
+        <textarea id="f_stateExpr">${v.stateExpr}</textarea>
+        <div class="hint">${t('stateExprHint')}</div></div>
+      <div class="field full"><label>${t('currentExpr')}</label>
+        <textarea id="f_currentExpr">${v.currentExpr}</textarea>
+        <div class="hint">${t('currentExprHint')}</div></div>`;
+    area.appendChild(g);
+    g.querySelectorAll('input,textarea').forEach(el => {
+      el.oninput = () => {
+        v.paramLines = g.querySelector('#f_paramLines').value;
+        v.statevar = g.querySelector('#f_statevar').value;
+        v.x0 = g.querySelector('#f_x0').value;
+        v.stateExpr = g.querySelector('#f_stateExpr').value;
+        v.currentExpr = g.querySelector('#f_currentExpr').value;
+        update();
+      };
+    });
+  } else {
+    const normal = m.params.filter(p => !p.adv);
+    const advanced = m.params.filter(p => p.adv);
+    area.appendChild(makeGrid(normal, v));
+    if (advanced.length) {
+      const d = document.createElement('details');
+      d.className = 'advanced';
+      d.innerHTML = `<summary>${t('advanced')}</summary>`;
+      d.appendChild(makeGrid(advanced, v));
+      area.appendChild(d);
+    }
+  }
+  const tb = document.createElement('details');
+  tb.className = 'advanced';
+  tb.innerHTML = `<summary>${t('testbench')}</summary>` + makeTbGrid(v, m.tb);
+  area.appendChild(tb);
+  bindTb(tb, v);
+}
+
+function makeGrid(params, v) {
+  const g = document.createElement('div');
+  g.className = 'grid';
+  g.style.marginTop = '14px';
+  params.forEach(p => {
+    const f = document.createElement('div');
+    f.className = 'field';
+    const hint = p.hint ? `<div class="hint">${L(p.hint)}</div>` : '';
+    f.innerHTML = `<label>${L(p.label)}</label><input data-k="${p.key}" type="text" value="${v[p.key]}">${hint}`;
+    f.querySelector('input').oninput = e => { v[p.key] = e.target.value; update(); };
+    g.appendChild(f);
+  });
+  return g;
+}
+
+function makeTbGrid(v, def) {
+  if (!v.tb) v.tb = { ...def };
+  const tb = v.tb;
+  return `<div class="grid" style="margin-top:12px">
+    <div class="field"><label>${t('amp')}</label><input data-tb="amp" type="text" value="${tb.amp}"></div>
+    <div class="field"><label>${t('freq')}</label><input data-tb="freq" type="text" value="${tb.freq}"></div>
+    <div class="field"><label>${t('tstop')}</label><input data-tb="tstop" type="text" value="${tb.tstop}"></div>
+    <div class="field"><label>${t('maxstep')}</label><input data-tb="maxstep" type="text" value="${tb.maxstep}"></div>
+  </div>`;
+}
+function bindTb(container, v) {
+  container.querySelectorAll('[data-tb]').forEach(el => {
+    el.oninput = () => { v.tb[el.dataset.tb] = el.value; update(); };
+  });
+}
+
+function collect() {
+  const m = MODELS[currentKey];
+  const v = initValues(currentKey);
+  const p = { ...v, tb: { ...(v.tb || m.tb) } };
+  p.name = sanitizeName(v.name, m.defaultName);
+  if (currentKey === 'custom') {
+    p.statevar = sanitizeName(v.statevar, 'x');
+    p.tb.statevar = p.statevar;
+  }
+  return p;
+}
+
+function validate(p) {
+  const warns = [];
+  if (currentKey !== 'custom' && p.ron !== undefined && p.roff !== undefined) {
+    const ron = +p.ron, roff = +p.roff;
+    if (!(ron > 0) || !(roff > 0)) warns.push(t('warnRon'));
+    if (roff <= ron) warns.push(t('warnRatio'));
+    if (currentKey === 'vourkas') {
+      if (!(+p.vset > 0)) warns.push(t('warnVp'));
+      if (!(+p.vreset < 0)) warns.push(t('warnVn'));
+    }
+  }
+  const model = MODELS[currentKey];
+  if (p.x0 !== undefined && currentKey !== 'custom' && !model.x0Free) {
+    if (+p.x0 < 0 || +p.x0 > 1) warns.push(t('warnX0'));
+  }
+  return warns;
+}
+
+function update() {
+  const p = collect();
+  const warns = validate(p);
+  const wb = document.getElementById('warnBox');
+  if (warns.length) { wb.style.display = 'block'; wb.textContent = warns.join(' '); }
+  else { wb.style.display = 'none'; }
+
+  let lib;
+  try { lib = MODELS[currentKey].build(p); }
+  catch (e) { lib = '* ' + t('fail') + e.message; }
+
+  document.getElementById('preview').textContent = lib;
+  document.getElementById('fileName').textContent = p.name + '.lib';
+  window.__last = { p, lib };
+}
+
+function applyStaticText() {
+  document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  document.title = t('title');
+  document.getElementById('appTitle').textContent = t('title');
+  document.getElementById('appSub').textContent = t('sub');
+  document.getElementById('groupCommon').textContent = t('common');
+  document.getElementById('groupOther').textContent = t('other');
+  document.getElementById('btnLib').textContent = t('dlLib');
+  document.getElementById('btnZip').textContent = t('dlZip');
+  document.getElementById('btnCopy').textContent = t('copy');
+  document.getElementById('previewTitle').textContent = t('preview');
+  document.getElementById('howTitle').textContent = t('how');
+  document.getElementById('howList').innerHTML = t('steps').map(s => `<li>${s}</li>`).join('');
+  document.getElementById('disclaimer').textContent = t('disclaimer');
+  document.getElementById('btnZh').classList.toggle('active', lang === 'zh');
+  document.getElementById('btnEn').classList.toggle('active', lang === 'en');
+  document.getElementById('btnTheme').textContent = theme === 'dark' ? '☀' : '☾';
+}
+
+function renderAll() {
+  initValues(currentKey);
+  applyStaticText();
+  renderList();
+  renderForm();
+  update();
+}
+
+// language
+document.getElementById('btnZh').onclick = () => { lang = 'zh'; localStorage.setItem('mm_lang', lang); renderAll(); };
+document.getElementById('btnEn').onclick = () => { lang = 'en'; localStorage.setItem('mm_lang', lang); renderAll(); };
+
+// theme
+function applyTheme() {
+  document.documentElement.dataset.theme = theme;
+  document.getElementById('btnTheme').textContent = theme === 'dark' ? '☀' : '☾';
+}
+document.getElementById('btnTheme').onclick = () => {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('mm_theme', theme);
+  applyTheme();
+};
+applyTheme();
+
+document.getElementById('btnCopy').onclick = async () => {
+  const { lib } = window.__last;
+  try {
+    await navigator.clipboard.writeText(lib);
+    flash(t('copied'));
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = lib;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+    flash(t('copied'));
+  }
+};
+document.getElementById('btnLib').onclick = () => {
+  const { p, lib } = window.__last;
+  download(new Blob([lib], { type: 'text/plain;charset=utf-8' }), p.name + '.lib');
+  flash(t('libDone'));
+};
+document.getElementById('btnZip').onclick = () => {
+  const { p, lib } = window.__last;
+  const zip = zipStore([
+    { name: p.name + '.lib', data: lib },
+    { name: 'memristor.asy', data: buildAsy(p.name) },
+    { name: 'test_' + p.name + '.asc', data: buildAsc(p) }
+  ]);
+  download(zip, p.name + '_ltspice.zip');
+  flash(t('zipDone'));
+};
+function flash(msg) {
+  const s = document.getElementById('statusMsg');
+  s.textContent = msg;
+  clearTimeout(flash._t);
+  flash._t = setTimeout(() => s.textContent = '', 2200);
+}
+
+renderAll();
+</script>
+</body>
+</html>
